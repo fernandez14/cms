@@ -968,6 +968,7 @@ ul.icons {
   margin-bottom: 14px;
   min-height: 34px;
 
+  &.flex,
   .flex {
     align-items: flex-start;
   }
@@ -2547,6 +2548,7 @@ $checkboxPadding: $checkboxSize + 4;
   }
 
   .element.small,
+  .flex,
   .btn {
     clear: both;
   }
@@ -2570,6 +2572,10 @@ $checkboxPadding: $checkboxSize + 4;
 
   .caboose {
     @include floatleft;
+  }
+
+  .flex .btn {
+    float: none !important;
   }
 }
 
@@ -2926,6 +2932,7 @@ ul.tree,
   position: absolute;
   left: 20%;
   width: 60%;
+  z-index: 1000;
 }
 
 .progressbar-inner {
@@ -3532,6 +3539,7 @@ ul.tree,
   align-items: center;
   height: 190px;
   background-color: $grey900;
+  cursor: pointer;
 
   &.loading {
     &:after {
@@ -3566,10 +3574,6 @@ ul.tree,
     }
   }
 
-  &.editable {
-    cursor: pointer;
-  }
-
   .buttons {
     opacity: 0;
     position: absolute;
@@ -3590,21 +3594,21 @@ ul.tree,
           transition: opacity linear 100ms, backdrop-filter linear 100ms;
         }
       }
+
+      &:hover {
+        background-color: $grey500;
+
+        @supports (backdrop-filter: blur(10px)) {
+          & {
+            background-color: transparentize($grey500, 0.3);
+          }
+        }
+      }
     }
   }
 
   &:hover .buttons {
     opacity: 1;
-  }
-
-  &:not(.editable) .buttons .btn:hover {
-    background-color: $grey500;
-
-    @supports (backdrop-filter: blur(10px)) {
-      & {
-        background-color: transparentize($grey500, 0.3);
-      }
-    }
   }
 }
 
@@ -4553,6 +4557,8 @@ fieldset {
   .password {
     flex: 1;
     border: none;
+    background: transparent;
+    box-shadow: none;
   }
 
   .password-toggle {

@@ -12,6 +12,7 @@ use craft\base\MissingComponentInterface;
 use craft\base\PluginInterface;
 use craft\elements\Asset;
 use craft\elements\db\ElementQuery;
+use craft\errors\AssetException;
 use craft\helpers\App;
 use craft\helpers\ArrayHelper;
 use craft\helpers\DateTimeHelper;
@@ -985,6 +986,7 @@ class Extension extends AbstractExtension implements GlobalsInterface
             new TwigFunction('configure', [Craft::class, 'configure']),
             new TwigFunction('cpUrl', [UrlHelper::class, 'cpUrl']),
             new TwigFunction('create', [Craft::class, 'createObject']),
+            new TwigFunction('dataUrl', [$this, 'dataUrlFunction']),
             new TwigFunction('expression', [$this, 'expressionFunction']),
             new TwigFunction('floor', 'floor'),
             new TwigFunction('getenv', [App::class, 'env']),
@@ -1005,9 +1007,11 @@ class Extension extends AbstractExtension implements GlobalsInterface
             new TwigFunction('csrfInput', [Html::class, 'csrfInput'], ['is_safe' => ['html']]),
             new TwigFunction('hiddenInput', [Html::class, 'hiddenInput'], ['is_safe' => ['html']]),
             new TwigFunction('input', [Html::class, 'input'], ['is_safe' => ['html']]),
+            new TwigFunction('ol', [Html::class, 'ol'], ['is_safe' => ['html']]),
             new TwigFunction('redirectInput', [Html::class, 'redirectInput'], ['is_safe' => ['html']]),
             new TwigFunction('svg', [$this, 'svgFunction'], ['is_safe' => ['html']]),
             new TwigFunction('tag', [$this, 'tagFunction'], ['is_safe' => ['html']]),
+            new TwigFunction('ul', [Html::class, 'ul'], ['is_safe' => ['html']]),
 
             // DOM event functions
             new TwigFunction('head', [$this->view, 'head']),
@@ -1030,6 +1034,25 @@ class Extension extends AbstractExtension implements GlobalsInterface
     public function cloneFunction($var)
     {
         return clone $var;
+    }
+
+    /**
+     * Generates a base64-encoded [data URL](https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/Data_URIs) for the given file path or asset.
+     *
+     * @param string|Asset $file A file path on an asset
+     * @param string|null $mimeType The file’s MIME type. If `null` then it will be determined automatically.
+     * @return string The data URL
+     * @throws InvalidConfigException if `$file` is an invalid file path, or an asset with a missing/invalid volume ID
+     * @throws AssetException if a stream could not be created for the asset
+     * @since 3.5.13
+     */
+    public function dataUrlFunction($file, string $mimeType = null): string
+    {
+        if ($file instanceof Asset) {
+            return $file->getDataUrl();
+        }
+
+        return Html::dataUrl(Craft::getAlias($file), $mimeType);
     }
 
     /**
@@ -1236,6 +1259,7 @@ class Extension extends AbstractExtension implements GlobalsInterface
         $isInstalled = Craft::$app->getIsInstalled();
         $request = Craft::$app->getRequest();
         $generalConfig = Craft::$app->getConfig()->getGeneral();
+        $setPasswordRequestPath = $generalConfig->getSetPasswordRequestPath();
 
         $globals = [
             'view' => $this->view,
@@ -1258,6 +1282,7 @@ class Extension extends AbstractExtension implements GlobalsInterface
             'isInstalled' => $isInstalled,
             'loginUrl' => UrlHelper::siteUrl($generalConfig->getLoginPath()),
             'logoutUrl' => UrlHelper::siteUrl($generalConfig->getLogoutPath()),
+            'setPasswordUrl' => $setPasswordRequestPath !== null ? UrlHelper::siteUrl($setPasswordRequestPath) : null,
             'now' => new DateTime(null, new \DateTimeZone(Craft::$app->getTimeZone()))
         ];
 

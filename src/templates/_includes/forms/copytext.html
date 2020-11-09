@@ -1,4 +1,4 @@
-{% set id = id ?? "copytext-#{random()}" %}
+{% set id = id ?? "copytext#{random()}" %}
 {% set buttonId = buttonId ?? "#{id}-btn" -%}
 
 <div class="copytext">
@@ -13,6 +13,7 @@
             icon: 'clipboard',
         },
         title: 'Copy to clipboard'|t('app'),
+        'aria-label': 'Copy to clipboard'|t('app'),
     }) -}}
 </div>
 

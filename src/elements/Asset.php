@@ -339,7 +339,7 @@ class Asset extends Element
             ];
 
             $userSession = Craft::$app->getUser();
-            if ($userSession->checkPermission("replaceFilesInVolume:{$volume->uid}")) {
+            if ($userSession->checkPermission("replaceFilesInVolume:$volume->uid")) {
                 // Rename/Replace File
                 $actions[] = RenameFile::class;
                 $actions[] = ReplaceFile::class;
@@ -357,12 +357,12 @@ class Asset extends Element
             ];
 
             // Edit Image
-            if ($userSession->checkPermission('editImagesInVolume:' . $volume->uid)) {
+            if ($userSession->checkPermission("editImagesInVolume:$volume->uid")) {
                 $actions[] = EditImage::class;
             }
 
             // Delete
-            if ($userSession->checkPermission('deleteFilesAndFoldersInVolume:' . $volume->uid)) {
+            if ($userSession->checkPermission("deleteFilesAndFoldersInVolume:$volume->uid")) {
                 $actions[] = DeleteAssets::class;
             }
         }
@@ -508,12 +508,12 @@ class Asset extends Element
         }
 
         $userSession = Craft::$app->getUser();
-        $canUpload = $userSession->checkPermission("saveAssetInVolume:{$volume->uid}");
-        $canMoveTo = $canUpload && $userSession->checkPermission("deleteFilesAndFoldersInVolume:{$volume->uid}");
+        $canUpload = $userSession->checkPermission("saveAssetInVolume:$volume->uid");
+        $canMoveTo = $canUpload && $userSession->checkPermission("deleteFilesAndFoldersInVolume:$volume->uid");
         $canMovePeerFilesTo = (
             $canMoveTo &&
-            $userSession->checkPermission("editPeerFilesInVolume:{$volume->uid}") &&
-            $userSession->checkPermission("deletePeerFilesInVolume:{$volume->uid}")
+            $userSession->checkPermission("editPeerFilesInVolume:$volume->uid") &&
+            $userSession->checkPermission("deletePeerFilesInVolume:$volume->uid")
         );
 
         $source = [
@@ -532,7 +532,7 @@ class Asset extends Element
         ];
 
         if ($user) {
-            if (!$user->can("viewPeerFilesInVolume:{$volume->uid}")) {
+            if (!$user->can("viewPeerFilesInVolume:$volume->uid")) {
                 $source['criteria']['uploaderId'] = $user->id;
             }
         }
@@ -759,16 +759,6 @@ class Asset extends Element
     }
 
     /**
-     * @inheritdoc
-     */
-    public function fields()
-    {
-        $fields = parent::fields();
-        $fields['volumeId'] = 'volumeId';
-        return $fields;
-    }
-
-    /**
      * Returns the volume’s ID.
      *
      * @return int|null
@@ -857,8 +847,23 @@ class Asset extends Element
         $volume = $this->getVolume();
         $userSession = Craft::$app->getUser();
         return (
-            $userSession->checkPermission("saveAssetInVolume:{$volume->uid}") &&
-            ($userSession->getId() == $this->uploaderId || $userSession->checkPermission("editPeerFilesInVolume:{$volume->uid}"))
+            $userSession->checkPermission("saveAssetInVolume:$volume->uid") &&
+            ($userSession->getId() == $this->uploaderId || $userSession->checkPermission("editPeerFilesInVolume:$volume->uid"))
+        );
+    }
+
+    /**
+     * @inheritdoc
+     * @since 3.5.15
+     */
+    public function getIsDeletable(): bool
+    {
+        $userSession = Craft::$app->getUser();
+        $volume = $this->getVolume();
+
+        return (
+            $userSession->checkPermission("deleteFilesAndFoldersInVolume:$volume->uid") &&
+            ($userSession->getId() == $this->uploaderId || $userSession->checkPermission("deletePeerFilesInVolume:$volume->uid"))
         );
     }
 
@@ -883,7 +888,7 @@ class Asset extends Element
         }
 
         $filename = $this->getFilename(false);
-        $path = "assets/{$volume->handle}/{$this->id}-{$filename}";
+        $path = "assets/$volume->handle/$this->id-$filename";
 
         $params = [];
         if (Craft::$app->getIsMultiSite()) {
@@ -996,7 +1001,11 @@ class Asset extends Element
                 }
             }
 
-            $srcset[] = $this->getUrl($sizeTransform) . ($size !== '1x' ? " {$value}{$unit}" : '');
+            if (!empty($transform->format)) {
+                $sizeTransform['format'] = $transform->format;
+            }
+
+            $srcset[] = $this->getUrl($sizeTransform) . ($size !== '1x' ? " $value$unit" : '');
         }
 
         return implode(', ', $srcset);
@@ -1153,7 +1162,7 @@ class Asset extends Element
         try {
             return Craft::$app->getAssets()->getAssetUrl($this, $transform, $generateNow);
         } catch (VolumeObjectNotFoundException $e) {
-            Craft::error("Could not determine asset's URL ({$this->id}): {$e->getMessage()}");
+            Craft::error("Could not determine asset's URL ($this->id): {$e->getMessage()}");
             Craft::$app->getErrorHandler()->logException($e);
             return UrlHelper::actionUrl('not-found');
         }
@@ -1455,6 +1464,19 @@ class Asset extends Element
     }
 
     /**
+     * Generates a base64-encoded [data URL](https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/Data_URIs) for the asset.
+     *
+     * @return string
+     * @throws InvalidConfigException if [[volumeId]] is missing or invalid
+     * @throws AssetException if a stream could not be created
+     * @since 3.5.13
+     */
+    public function getDataUrl(): string
+    {
+        return Html::dataUrlFromString($this->getContents(), $this->getMimeType());
+    }
+
+    /**
      * Return whether the Asset has a URL.
      *
      * @return bool
@@ -1616,8 +1638,8 @@ class Asset extends Element
 
             $editable = (
                 $this->getSupportsImageEditor() &&
-                $userSession->checkPermission("editImagesInVolume:{$volume->uid}") &&
-                ($userSession->getId() == $this->uploaderId || $userSession->checkPermission("editPeerImagesInVolume:{$volume->uid}"))
+                $userSession->checkPermission("editImagesInVolume:$volume->uid") &&
+                ($userSession->getId() == $this->uploaderId || $userSession->checkPermission("editPeerImagesInVolume:$volume->uid"))
             );
 
             $html .= '<div class="preview-thumb-container' . ($editable ? ' editable' : '') . '">' .
@@ -1674,6 +1696,7 @@ class Asset extends Element
         $names[] = 'height';
         $names[] = 'mimeType';
         $names[] = 'path';
+        $names[] = 'volumeId';
         $names[] = 'width';
         return $names;
     }
@@ -1717,7 +1740,7 @@ class Asset extends Element
         if ($this->newFolderId !== null || $this->newFilename !== null) {
             $folderId = $this->newFolderId ?: $this->folderId;
             $filename = $this->newFilename ?: $this->filename;
-            $this->newLocation = "{folder:{$folderId}}{$filename}";
+            $this->newLocation = "{folder:$folderId}$filename";
             $this->newFolderId = $this->newFilename = null;
         }
 
@@ -1877,13 +1900,13 @@ class Asset extends Element
             $attributes['data-peer-file'] = null;
             $volume = $this->getVolume();
             $movable = (
-                $userSession->checkPermission("editPeerFilesInVolume:{$volume->uid}") &&
-                $userSession->checkPermission("deletePeerFilesInVolume:{$volume->uid}")
+                $userSession->checkPermission("editPeerFilesInVolume:$volume->uid") &&
+                $userSession->checkPermission("deletePeerFilesInVolume:$volume->uid")
             );
-            $replaceable = $userSession->checkPermission("replacePeerFilesInVolume:{$volume->uid}");
+            $replaceable = $userSession->checkPermission("replacePeerFilesInVolume:$volume->uid");
             $imageEditable = (
                 $imageEditable &&
-                ($userSession->checkPermission("editPeerImagesInVolume:{$volume->uid}"))
+                ($userSession->checkPermission("editPeerImagesInVolume:$volume->uid"))
             );
         }
 
@@ -1916,8 +1939,8 @@ class Asset extends Element
 
         $volume = $this->getVolume();
         return (
-            $userSession->checkPermission("editPeerFilesInVolume:{$volume->uid}") &&
-            $userSession->checkPermission("deletePeerFilesInVolume:{$volume->uid}")
+            $userSession->checkPermission("editPeerFilesInVolume:$volume->uid") &&
+            $userSession->checkPermission("deletePeerFilesInVolume:$volume->uid")
         );
     }
 
@@ -1935,7 +1958,7 @@ class Asset extends Element
 
         if (!$this->_width || !$this->_height) {
             if ($this->getScenario() !== self::SCENARIO_CREATE) {
-                Craft::warning("Asset {$this->id} is missing its width or height", __METHOD__);
+                Craft::warning("Asset $this->id is missing its width or height", __METHOD__);
             }
 
             return [null, null];

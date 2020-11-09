@@ -81,12 +81,14 @@ class ProjectConfig
 
     /**
      * Ensure all site config changes are processed immediately in a safe manner.
+     *
+     * @param bool $force Whether to proceed even if YAML changes are not currently being applied
      */
-    public static function ensureAllSitesProcessed()
+    public static function ensureAllSitesProcessed(bool $force = false)
     {
         $projectConfig = Craft::$app->getProjectConfig();
 
-        if (static::$_processedSites || !$projectConfig->getIsApplyingYamlChanges()) {
+        if (static::$_processedSites || (!$force && !$projectConfig->getIsApplyingYamlChanges())) {
             return;
         }
 
@@ -97,12 +99,12 @@ class ProjectConfig
 
         foreach ($allGroups as $groupUid => $groupData) {
             // Ensure group is processed
-            $projectConfig->processConfigChanges(Sites::CONFIG_SITEGROUP_KEY . '.' . $groupUid);
+            $projectConfig->processConfigChanges(Sites::CONFIG_SITEGROUP_KEY . '.' . $groupUid, false, null, $force);
         }
 
         foreach ($allSites as $siteUid => $siteData) {
             // Ensure site is processed
-            $projectConfig->processConfigChanges(Sites::CONFIG_SITES_KEY . '.' . $siteUid);
+            $projectConfig->processConfigChanges(Sites::CONFIG_SITES_KEY . '.' . $siteUid, false, null, $force);
         }
     }
 
@@ -157,7 +159,7 @@ class ProjectConfig
     /**
      * Resets the static memoization variables.
      *
-     * @return void
+     * @return null
      */
     public static function reset()
     {
@@ -448,21 +450,28 @@ class ProjectConfig
     /**
      * Returns a diff of the pending project config YAML changes, compared to the currently loaded project config.
      *
+     * @param bool $invert Whether to reverse the diff, so the loaded config is treated as the source of truth
      * @return string
      * @since 3.5.6
      */
-    public static function diff(): string
+    public static function diff(bool $invert = false): string
     {
         $projectConfig = Craft::$app->getProjectConfig();
+        $cacheKey = ProjectConfigService::DIFF_CACHE_KEY . ($invert ? ':reverse' : '');
 
-        return Craft::$app->getCache()->getOrSet(ProjectConfigService::DIFF_CACHE_KEY, function() use ($projectConfig): string {
+        return Craft::$app->getCache()->getOrSet($cacheKey, function() use ($projectConfig, $invert): string {
             $currentConfig = $projectConfig->get();
             $pendingConfig = $projectConfig->get(null, true);
             $currentYaml = Yaml::dump(static::cleanupConfig($currentConfig), 20, 2);
             $pendingYaml = Yaml::dump(static::cleanupConfig($pendingConfig), 20, 2);
             $builder = new UnifiedDiffOutputBuilder('');
             $differ = new Differ($builder);
-            $diff = $differ->diff($currentYaml, $pendingYaml);
+
+            if ($invert) {
+                $diff = $differ->diff($pendingYaml, $currentYaml);
+            } else {
+                $diff = $differ->diff($currentYaml, $pendingYaml);
+            }
 
             // Cleanup
             $diff = preg_replace("/^@@ @@\n/", '', $diff);
@@ -475,9 +484,121 @@ class ProjectConfig
             'dependencies' => [
                 $projectConfig->getCacheDependency(),
                 new ExpressionDependency([
-                    'expression' => 'md5(' . Json::class . '::encode('. Craft::class . '::$app->getProjectConfig()->get(null, true)))',
+                    'expression' => 'md5(' . Json::class . '::encode(' . Craft::class . '::$app->getProjectConfig()->get(null, true)))',
                 ]),
             ],
         ]));
+    }
+
+    /**
+     * Updates the `dateModified` value in `config/project/project.yaml`.
+     *
+     * If a Git conflict is detected on the `dateModified` value, a conflict resolution will also be attempted.
+     *
+     * @param int|null $timestamp The updated `dateModified` value. If `null`, the current time will be used.
+     * @since 3.5.14
+     */
+    public static function touch(int $timestamp = null)
+    {
+        if ($timestamp === null) {
+            $timestamp = time();
+        }
+
+        $timestampLine = "dateModified: $timestamp\n";
+
+        $path = Craft::$app->getPath()->getProjectConfigFilePath();
+        $handle = fopen($path, 'r');
+        $foundTimestamp = false;
+
+        // Conflict stuff. "bt" = "before timestamp"; "at" = "after timestamp"
+        $inMine = $inTheirs = $foundTimestampInConflict = false;
+        $mineMarker = $theirsMarker = null;
+        $btMine = $atMine = $btTheirs = $atTheirs = null;
+        $conflictDl = "=======\n";
+
+        $newContents = '';
+
+        while (($line = fgets($handle)) !== false) {
+            $isTimestamp = strpos($line, 'dateModified:') === 0;
+
+            if ($foundTimestamp) {
+                if (!$isTimestamp) {
+                    $newContents .= $line;
+                }
+                continue;
+            }
+
+            if (!$isTimestamp) {
+                if (strpos($line, '<<<<<<<') === 0) {
+                    $mineMarker = $line;
+                    $inMine = true;
+                    $inTheirs = false;
+                    $btMine = '';
+                    continue;
+                }
+
+                if (strpos($line, '=======') === 0) {
+                    $inMine = false;
+                    $inTheirs = true;
+                    $btTheirs = '';
+                    continue;
+                }
+
+                if (strpos($line, '>>>>>>>') === 0) {
+                    $theirsMarker = $line;
+                    // We've reached the end of the conflict
+                    if ($btMine || $btTheirs) {
+                        $newContents .= $mineMarker . $btMine . $conflictDl . $btTheirs . $theirsMarker;
+                    }
+                    if ($foundTimestampInConflict) {
+                        $newContents .= $timestampLine;
+                        if ($atMine || $atTheirs) {
+                            $newContents .= $mineMarker . $atMine . $conflictDl . $atTheirs . $theirsMarker;
+                        }
+                        $foundTimestamp = true;
+                    }
+                    $inMine = $inTheirs = false;
+                    $btMine = $atMine = $btTheirs = $atTheirs = null;
+                    continue;
+                }
+            }
+
+            if ($isTimestamp) {
+                if ($inMine || $inTheirs) {
+                    // Just start keeping track of the post-timestamp conflict
+                    if ($inMine) {
+                        $atMine = '';
+                    } else {
+                        $atTheirs = '';
+                    }
+                    $foundTimestampInConflict = true;
+                } else {
+                    $newContents .= $timestampLine;
+                    $foundTimestamp = true;
+                }
+            } else if ($inMine) {
+                if ($atMine === null) {
+                    $btMine .= $line;
+                } else {
+                    $atMine .= $line;
+                }
+            } else if ($inTheirs) {
+                if ($atTheirs === null) {
+                    $btTheirs .= $line;
+                } else {
+                    $atTheirs .= $line;
+                }
+            } else {
+                $newContents .= $line;
+            }
+        }
+
+        fclose($handle);
+
+        if (!$foundTimestamp) {
+            $newContents .= $timestampLine;
+        }
+
+        FileHelper::writeToFile($path, $newContents);
     }
 }

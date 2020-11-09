@@ -16,12 +16,10 @@ use craft\fields\data\MultiOptionsFieldData;
 use craft\fields\data\OptionData;
 use craft\fields\data\SingleOptionFieldData;
 use craft\gql\arguments\OptionField as OptionFieldArguments;
-use craft\gql\GqlEntityRegistry;
 use craft\gql\resolvers\OptionField as OptionFieldResolver;
 use craft\helpers\ArrayHelper;
 use craft\helpers\Db;
 use craft\helpers\Json;
-use GraphQL\Type\Definition\EnumType;
 use GraphQL\Type\Definition\Type;
 use yii\db\Schema;
 
@@ -272,14 +270,14 @@ abstract class BaseOptionsField extends Field implements PreviewableFieldInterfa
 
         if ($this->multi) {
             // Convert the value to a MultiOptionsFieldData object
-            $options = [];
+            $selectedOptions = [];
             foreach ($selectedValues as $selectedValue) {
                 $index = array_search($selectedValue, $optionValues, true);
                 $valid = $index !== false;
                 $label = $valid ? $optionLabels[$index] : null;
-                $options[] = new OptionData($label, $selectedValue, true, $valid);
+                $selectedOptions[] = new OptionData($label, $selectedValue, true, $valid);
             }
-            $value = new MultiOptionsFieldData($options);
+            $value = new MultiOptionsFieldData($selectedOptions);
         } else if (!empty($selectedValues)) {
             // Convert the value to a SingleOptionFieldData object
             $selectedValue = reset($selectedValues);

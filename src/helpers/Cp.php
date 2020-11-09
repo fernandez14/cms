@@ -161,7 +161,8 @@ class Cp
         if (
             $path !== 'utilities/project-config' &&
             $user->can('utility:project-config') &&
-            $projectConfig->areChangesPending()
+            $projectConfig->areChangesPending() &&
+            ($projectConfig->writeYamlAutomatically || $projectConfig->get('dateModified') <= $projectConfig->get('dateModified', true))
         ) {
             $alerts[] = Craft::t('app', 'Your project config YAML files contain pending changes.') .
                 ' ' . '<a class="go" href="' . UrlHelper::url('utilities/project-config') . '">' . Craft::t('app', 'Review') . '</a>';
@@ -285,6 +286,10 @@ class Cp
             $html .= ' data-editable';
         }
 
+        if ($context === 'index' && $element->getIsDeletable()) {
+            $html .= ' data-deletable';
+        }
+
         if ($element->trashed) {
             $html .= ' data-trashed';
         }
@@ -373,7 +378,7 @@ class Cp
         $tip = $config['tip'] ?? null;
         $warning = $config['warning'] ?? null;
         $orientation = $config['orientation'] ?? ($site ? $site->getLocale() : Craft::$app->getLocale())->getOrientation();
-        $translatable = $config['translatable'] ?? ($site !== null);
+        $translatable = Craft::$app->getIsMultiSite() ? ($config['translatable'] ?? ($site !== null)) : false;
         $errors = $config['errors'] ?? null;
         $fieldClass = array_merge(array_filter([
             'field',

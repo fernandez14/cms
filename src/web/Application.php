@@ -82,17 +82,6 @@ class Application extends \yii\web\Application
     const EVENT_AFTER_EDITION_CHANGE = 'afterEditionChange';
 
     /**
-     * Constructor.
-     *
-     * @param array $config
-     */
-    public function __construct(array $config = [])
-    {
-        Craft::$app = $this;
-        parent::__construct($config);
-    }
-
-    /**
      * Initializes the application.
      */
     public function init()
@@ -407,13 +396,13 @@ class Application extends \yii\web\Application
             return;
         }
 
+        // Only load the debug toolbar if it's enabled for the user, or Dev Mode is enabled and the request wants it
         $user = $this->getUser()->getIdentity();
-        if (!$user || !$user->admin) {
-            return;
-        }
-
         $pref = $request->getIsCpRequest() ? 'enableDebugToolbarForCp' : 'enableDebugToolbarForSite';
-        if (!$user->getPreference($pref)) {
+        if (!(
+            ($user && $user->admin && $user->getPreference($pref)) ||
+            (YII_DEBUG && $request->getHeaders()->get('X-Debug') === 'enable')
+        )) {
             return;
         }
 

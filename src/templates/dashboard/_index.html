@@ -19,7 +19,7 @@
             </div>
         </div>
 
-        <button type="button" id="widgetManagerBtn" class="btn settings icon" title="{{ 'Settings'|t('app') }}"></button>
+        <button type="button" id="widgetManagerBtn" class="btn settings icon" title="{{ 'Settings'|t('app') }}" aria-label="{{ 'Settings'|t('app') }}"></button>
     </div>
 {% endblock %}
 
@@ -48,7 +48,7 @@
                             <div class="settings icon hidden"></div>
                         </div>
                     </div>
-                    <div class="back">
+                    <div class="back hidden">
                         <form class="pane">
                             {{ hiddenInput('widgetId', widget.id) }}
                             <h2 class="first">{{ "{type} Settings"|t('app', { type: widget.name }) }}</h2>

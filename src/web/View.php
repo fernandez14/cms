@@ -8,17 +8,14 @@
 namespace craft\web;
 
 use Craft;
-use craft\base\ElementInterface;
 use craft\events\RegisterTemplateRootsEvent;
 use craft\events\TemplateEvent;
 use craft\helpers\Cp;
-use craft\helpers\ElementHelper;
 use craft\helpers\FileHelper;
 use craft\helpers\Html;
 use craft\helpers\Json;
 use craft\helpers\Path;
 use craft\helpers\StringHelper;
-use craft\helpers\UrlHelper;
 use craft\web\twig\Environment;
 use craft\web\twig\Extension;
 use craft\web\twig\Template;
@@ -1544,17 +1541,34 @@ JS;
      * {% hook "myAwesomeHook" %}
      * ```
      *
-     * When the hook tag gets invoked, your template hook function will get called. The $context argument will be the
+     * When the hook tag gets invoked, your template hook function will get called. The `$context` argument will be the
      * current Twig context array, which you’re free to manipulate. Any changes you make to it will be available to the
      * template following the tag. Whatever your template hook function returns will be output in place of the tag in
      * the template as well.
      *
+     * If you want to prevent additional hook methods from getting triggered, add a second `$handled` argument to your callback method,
+     * which should be passed by reference, and then set it to `true` within the method.
+     *
+     * ```php
+     * Craft::$app->view->hook('myAwesomeHook', function(&$context, &$handled) {
+     *     $context['foo'] = 'bar';
+     *     $handled = true;
+     *     return 'Hey!';
+     * });
+     * ```
+     *
      * @param string $hook The hook name.
      * @param callback $method The callback function.
+     * @param bool $append whether to append the method handler to the end of the existing method list for the hook. If `false`, the method will be
+     * inserted at the beginning of the existing method list.
      */
-    public function hook(string $hook, $method)
+    public function hook(string $hook, $method, bool $append = true)
     {
-        $this->_hooks[$hook][] = $method;
+        if ($append || empty($this->_hooks[$hook])) {
+            $this->_hooks[$hook][] = $method;
+        } else {
+            array_unshift($this->_hooks[$hook], $method);
+        }
     }
 
     /**
@@ -1571,8 +1585,12 @@ JS;
         $return = '';
 
         if (isset($this->_hooks[$hook])) {
+            $handled = false;
             foreach ($this->_hooks[$hook] as $method) {
-                $return .= $method($context);
+                $return .= $method($context, $handled);
+                if ($handled) {
+                    break;
+                }
             }
         }
 

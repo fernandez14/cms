@@ -87,6 +87,12 @@ class Assets extends BaseRelationField
     public $useSingleFolder = false;
 
     /**
+     * @var bool Whether it should be possible to upload files directly to the field.
+     * @since 3.5.13
+     */
+    public $allowUploads = true;
+
+    /**
      * @var string|null Where files should be uploaded to by default, in format
      * "folder:X", where X is the craft\models\VolumeFolder ID
      * (only used if [[useSingleFolder]] is false)
@@ -169,7 +175,7 @@ class Assets extends BaseRelationField
     private $_uploadedDataFiles;
 
     /**
-     * @var int|null The default upload location for this field to open in modal
+     * @var string|null The default upload location for this field to open in modal
      */
     private $_defaultUploadLocation;
 
@@ -194,6 +200,7 @@ class Assets extends BaseRelationField
         parent::init();
 
         $this->useSingleFolder = (bool)$this->useSingleFolder;
+        $this->allowUploads = (bool)$this->allowUploads;
         $this->showUnpermittedVolumes = (bool)$this->showUnpermittedVolumes;
         $this->showUnpermittedFiles = (bool)$this->showUnpermittedFiles;
 
@@ -657,8 +664,15 @@ class Assets extends BaseRelationField
     protected function inputTemplateVariables($value = null, ElementInterface $element = null): array
     {
         $variables = parent::inputTemplateVariables($value, $element);
+
+        $uploadVolume = $this->_uploadVolume();
         $variables['hideSidebar'] = $this->useSingleFolder;
-        $variables['defaultFieldLayoutId'] = $this->_uploadVolume()->fieldLayoutId ?? null;
+        $variables['canUpload'] = (
+            $this->allowUploads &&
+            $uploadVolume &&
+            Craft::$app->getUser()->checkPermission("saveAssetInVolume:$uploadVolume->uid")
+        );
+        $variables['defaultFieldLayoutId'] = $uploadVolume->fieldLayoutId ?? null;
         $variables['defaultUploadLocation'] = $this->_defaultUploadLocation;
 
         return $variables;
@@ -874,11 +888,11 @@ class Assets extends BaseRelationField
         if ($this->useSingleFolder) {
             $uploadVolume = $this->singleUploadLocationSource;
             $subpath = $this->singleUploadLocationSubpath;
-            $settingName = Craft::t('app', 'Upload Location');
+            $settingName = Craft::t('app', 'Asset Location');
         } else {
             $uploadVolume = $this->defaultUploadLocationSource;
             $subpath = $this->defaultUploadLocationSubpath;
-            $settingName = Craft::t('app', 'Default Upload Location');
+            $settingName = Craft::t('app', 'Default Asset Location');
         }
 
         $assets = Craft::$app->getAssets();
@@ -898,7 +912,7 @@ class Assets extends BaseRelationField
             // If this is a static path, go ahead and create it
             if (!preg_match('/\{|\}/', $subpath)) {
                 $volumeId = $this->_volumeIdBySourceKey($uploadVolume);
-                $folderId = $assets->ensureFolderByFullPathAndVolume($subpath, Craft::$app->getVolumes()->getVolumeById($volumeId));
+                $folderId = $assets->ensureFolderByFullPathAndVolume($subpath, Craft::$app->getVolumes()->getVolumeById($volumeId), false);
             }
 
             // If this is a new/disabled element, the subpath probably just contained a token that returned null, like {id}

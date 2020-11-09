@@ -121,6 +121,18 @@ class AssetTransforms extends Component
     private $_activeTransformIndex;
 
     /**
+     * Serializer
+     *
+     * @since 3.5.14
+     */
+    public function __serialize()
+    {
+        $vars = get_object_vars($this);
+        unset($vars['_transforms']);
+        return $vars;
+    }
+
+    /**
      * @inheritdoc
      */
     public function init()
@@ -1504,9 +1516,14 @@ class AssetTransforms extends Component
         }
 
         $transform = $index->getTransform();
+        $images = Craft::$app->getImages();
 
         if ($index->detectedFormat === null) {
             $index->detectedFormat = !empty($index->format) ? $index->format : $this->detectAutoTransformFormat($asset);
+        }
+
+        if ($index->format === 'webp' && !$images->getSupportsWebP()) {
+            throw new AssetTransformException("The `webp` format is not supported on this server!");
         }
 
         $volume = $asset->getVolume();
@@ -1533,7 +1550,6 @@ class AssetTransforms extends Component
         $imageSource = $asset->getTransformSource();
         $quality = $transform->quality ?: Craft::$app->getConfig()->getGeneral()->defaultImageQuality;
 
-        $images = Craft::$app->getImages();
         if (strtolower($asset->getExtension()) === 'svg' && $index->detectedFormat !== 'svg') {
             $image = $images->loadImage($imageSource, true, max($transform->width, $transform->height));
         } else {

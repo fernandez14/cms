@@ -18,7 +18,6 @@ use craft\elements\db\ElementQuery;
 use craft\elements\db\ElementQueryInterface;
 use craft\elements\exporters\Raw;
 use craft\events\ElementActionEvent;
-use craft\helpers\ArrayHelper;
 use craft\helpers\ElementHelper;
 use yii\db\Expression;
 use yii\web\BadRequestHttpException;
@@ -437,11 +436,17 @@ class ElementIndexesController extends BaseElementsController
         // Override with the request's params
         if ($criteria = $this->request->getBodyParam('criteria')) {
             if (isset($criteria['trashed'])) {
-                $criteria['trashed'] = (bool)$criteria['trashed'];
+                $criteria['trashed'] = filter_var($criteria['trashed'] ?? false, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false;
             }
-            if (ArrayHelper::remove($criteria, 'drafts')) {
-                $criteria['drafts'] = true;
-                $criteria['draftOf'] = false;
+            if (isset($criteria['drafts'])) {
+                $criteria['drafts'] = filter_var($criteria['drafts'] ?? false, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false;
+            }
+            if (isset($criteria['draftOf'])) {
+                if (is_numeric($criteria['draftOf']) && $criteria['draftOf'] != 0) {
+                    $criteria['draftOf'] = (int)$criteria['draftOf'];
+                } else {
+                    $criteria['draftOf'] = filter_var($criteria['draftOf'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                }
             }
             Craft::configure($query, $criteria);
         }
