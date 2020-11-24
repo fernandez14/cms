@@ -1,6 +1,7 @@
 {
-  "baseUrl": "https://craft.test/admin",
   "env": {
+    "SITE_URL": "https://craft.test/",
+    "CP_TRIGGER": "admin",
     "CP_LOGIN": "admin",
     "CP_PASSWORD": "password"
   },

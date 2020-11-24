@@ -33,7 +33,7 @@ Cypress.Commands.add("login", (loginName, password) => {
         password = Cypress.env('CP_PASSWORD')
     }
 
-    cy.request('POST', 'https://craft.test/index.php?p=admin/actions/users/login', {
+    cy.request('POST', Cypress.env('SITE_URL') + 'index.php?p=admin/actions/users/login', {
         loginName,
         password
     })

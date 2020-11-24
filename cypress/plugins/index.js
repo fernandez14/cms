@@ -19,6 +19,8 @@
 const { lighthouse, pa11y, prepareAudit } = require("cypress-audit");
 
 module.exports = (on, config) => {
+    config.baseUrl = config.env.SITE_URL + config.env.CP_TRIGGER
+
     on('before:browser:launch', (browser = {}, launchOptions) => {
         // `args` is an array of all the arguments that will
         // be passed to browsers when it launches
