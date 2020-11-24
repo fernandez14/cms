@@ -13,7 +13,7 @@
     "babel-loader": "^8.1.0",
     "blueimp-file-upload": "^10.31.0",
     "craftcms-sass": "^3.5.1",
-    "cypress": "^5.1.0",
+    "cypress": "^6.0.0",
     "cypress-audit": "^0.2.2",
     "d3": "^4.11.0",
     "d3-format": "^1.4.4",
