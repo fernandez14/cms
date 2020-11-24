@@ -15,3 +15,12 @@ Open Cypress and run one or multiple tests:
 ```
 npx cypress open
 ```
+
+## Craft Config
+
+CSRF protection needs to be disabled for Cypress to work properly.
+
+In your `config/general.php`:
+```
+'enableCsrfProtection' => false,
+```
