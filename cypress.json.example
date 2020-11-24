@@ -1,6 +1,6 @@
 {
   "env": {
-    "SITE_URL": "https://craft.test/",
+    "SITE_URL": "http://craft.test/",
     "CP_TRIGGER": "admin",
     "CP_LOGIN": "admin",
     "CP_PASSWORD": "password"
