@@ -40,10 +40,15 @@ Cypress.Commands.add("login", (loginName, password) => {
 })
 
 Cypress.Commands.add("runAudit", () => {
-    // cy.lighthouse()
-    cy.pa11y({
-        runners: ['htmlcs'],
-        threshold: 20,
-        standard: 'WCAG2AA',
-    });
+    if(Cypress.env('ENABLE_LIGHTHOUSE')) {
+        cy.lighthouse()
+    }
+
+    if(Cypress.env('ENABLE_PA11Y')) {
+        cy.pa11y({
+            runners: ['htmlcs'],
+            threshold: 20,
+            standard: 'WCAG2AA',
+        });
+    }
 })
