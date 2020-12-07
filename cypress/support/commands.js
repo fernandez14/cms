@@ -46,7 +46,7 @@ Cypress.Commands.add("runAudit", () => {
 
     if(Cypress.env('ENABLE_PA11Y')) {
         cy.pa11y({
-            runners: ['htmlcs'],
+            runners: ['axe'],
             threshold: 20,
             standard: 'WCAG2AA',
         });
